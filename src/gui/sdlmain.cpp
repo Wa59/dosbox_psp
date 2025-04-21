@@ -206,14 +206,14 @@ void GFX_Events() {
 	
 	if(state_change && pad.Buttons)
 		goto exit;
-	if(pad.Buttons == (PSP_CTRL_LTRIGGER | PSP_CTRL_RTRIGGER | PSP_CTRL_START | PSP_CTRL_DOWN)) {
+	if(pad.Buttons == (PSP_CTRL_LTRIGGER | PSP_CTRL_RTRIGGER | PSP_CTRL_START | PSP_CTRL_UP)) {
 		state_change = true;
 		do_joy = true;
 		pad.Buttons = 0;
 		pad.Lx = 127;
 		pad.Ly = 127;
 	}
-	if(pad.Buttons == (PSP_CTRL_LTRIGGER | PSP_CTRL_RTRIGGER | PSP_CTRL_SELECT | PSP_CTRL_DOWN)) {
+	if(pad.Buttons == (PSP_CTRL_LTRIGGER | PSP_CTRL_RTRIGGER | PSP_CTRL_SELECT | PSP_CTRL_UP)) {
 		state_change = true;
 		do_keyb = true;
 		pad.Buttons = 0;
@@ -1637,7 +1637,7 @@ char *realpath(const char *file_name, char *resolved_name);
 
 __attribute__((constructor)) void install_trap_handler() {
 	SceKernelLMOption option;
-	char path[MAXPATHLEN];
+	char path[255];
 	int args[2], fd, modid;
 
 	memset(&option, 0, sizeof(option));
@@ -1647,17 +1647,17 @@ __attribute__((constructor)) void install_trap_handler() {
 	option.position = 0;
 	option.access = 1;
 
-	//if(realpath("exception.prx", path) && ((modid = sceKernelLoadModule(path, 0, &option)) >= 0)) {
-		//args[0] = (int)trap_handler;
-		//args[1] = (int)&exception_regs;
-		//sceKernelStartModule(modid, 8, args, &fd, NULL);
-	//}
+	if(realpath("exception.prx", path) && ((modid = sceKernelLoadModule(path, 0, &option)) >= 0)) {
+		args[0] = (int)trap_handler;
+		args[1] = (int)&exception_regs;
+		sceKernelStartModule(modid, 8, args, &fd, NULL);
+	}
 
-	//if(realpath("fixup.prx", path) && ((modid = sceKernelLoadModule(path, 0, &option)) >= 0)) {
-		//fixup = true;
-		//sceKernelStartModule(modid, 0, args, &fd, NULL);
-		//sceKernelUnloadModule(modid);
-	//}
+	if(realpath("fixup.prx", path) && ((modid = sceKernelLoadModule(path, 0, &option)) >= 0)) {
+		fixup = true;
+		sceKernelStartModule(modid, 0, args, &fd, NULL);
+		sceKernelUnloadModule(modid);
+	}
 }
 static SceUID main_thid;
 static int exit_cbid;

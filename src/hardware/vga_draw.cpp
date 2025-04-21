@@ -166,12 +166,6 @@ static Bit8u * VGA_Draw_Changes_Line(Bitu vidstart, Bitu line, Bit8u *TempLine) 
 static Bit8u * VGA_Draw_Linear_Line(Bitu vidstart, Bitu line, Bit8u *TempLine) {
 	Bit8u *ret = &vga.draw.linear_base[ vidstart & vga.draw.linear_mask ];
 	memcpy(TempLine, ret, vga.draw.line_length);
-#if !defined(C_UNALIGNED_MEMORY)
-	if (GCC_UNLIKELY( ((Bitu)ret) & (sizeof(Bitu)-1)) ) {
-		memcpy( TempLine, ret, vga.draw.line_length );
-		return TempLine;
-	}
-#endif
 	return ret;
 }
 
@@ -487,14 +481,14 @@ static void INLINE VGA_ChangesStart( void ) {
 	vga.changes.start = vga.draw.address >> VGA_CHANGE_SHIFT;
 	vga.changes.last = vga.changes.start;
 	if ( vga.changes.lastAddress != vga.draw.address ) {
-//		LOG_MSG("Address");
+		//LOG_MSG("Address");
 		VGA_DrawLine = VGA_Draw_Linear_Line;
 		vga.changes.lastAddress = vga.draw.address;
 	} else if ( render.fullFrame ) {
-//		LOG_MSG("Full Frame");
+		//LOG_MSG("Full Frame");
 		VGA_DrawLine = VGA_Draw_Linear_Line;
 	} else {
-//		LOG_MSG("Changes");
+		//LOG_MSG("Changes");
 		VGA_DrawLine = VGA_Draw_Changes_Line;
 	}
 	vga.changes.active = true;
@@ -533,6 +527,7 @@ static void VGA_VerticalTimer(Bitu val) {
 	switch (vga.mode) {
 	case M_EGA:
 	case M_LIN4:
+		vga.draw.address += vga.config.bytes_skip;
 		vga.draw.address *= 8;
 		vga.draw.address += vga.config.pel_panning;
 #ifdef VGA_KEEP_CHANGES
@@ -859,6 +854,7 @@ void VGA_SetupDrawing(Bitu val) {
 		vga.draw.blocks = width;
 		width<<=3;
 		VGA_DrawLine=VGA_Draw_Linear_Line;
+		//VGA_DrawLine = VGA_Draw_Xlat16_Linear_Line;
 		vga.draw.linear_base = vga.mem.linear + VGA_CACHE_OFFSET;
 		vga.draw.linear_mask = 512 * 1024 - 1;
 		break;
