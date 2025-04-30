@@ -2,10 +2,20 @@
 
 #./autogen.sh
 
-#SDL_CONFIG="${PSPDEV}/psp/bin/sdl-config" CXXFLAGS="-I${PSPDEV}/psp/sdk/include -I${PSPDEV}/include/SDL -O2 -G0" LDFLAGS="-Wl,--allow-multiple-definition" LIBS="-lm -lpspdebug -lpspgu -lpspctrl -lpspdisplay -lpspge -lpspsdk -lpsprtc -lpspaudio -lstdc++ -lpspirkeyb -lc -lpspnet -lpspnet_inet -lpsppower -lpsputility -lpspuser -lpspkernel -L${PSPDEV}/psp/sdk/lib" CFLAGS="-I${PSPDEV}/psp/sdk/include" ./configure -host=psp
+SDL_CONFIG="${PSPDEV}/psp/bin/sdl-config"
 
+CXXFLAGS="-I${PSPDEV}/psp/sdk/include -I${PSPDEV}/include/SDL -O3 -G0"
+
+LDFLAGS="-Wl,--allow-multiple-definition -Wl,--no-as-needed"
+
+LIBS="-lpspdebug -lpspgu -lpspctrl -lpspdisplay -lpspge -lpspsdk -lpsprtc \
+      -lpspaudio -lstdc++ -lpspirkeyb -lc -lpspnet -lpspnet_inet -lpsppower \
+      -lpsputility -lpspuser -lpspkernel -L${PSPDEV}/psp/sdk/lib " 
+
+CFLAGS="-I${PSPDEV}/psp/sdk/include"
+
+#./configure -host=psp
 #make clean
-
 make
 
 cd src
@@ -18,6 +28,6 @@ psp-prxgen dosbox dosbox.prx
 
 mksfoex -d MEMSIZE=1 "DOSBox PSP" PARAM.SFO && pack-pbp EBOOT.PBP PARAM.SFO ICON0.PNG NULL NULL PIC1.PNG NULL dosbox.prx NULL
 
-cp EBOOT.PBP /home/wa59/.var/app/org.ppsspp.PPSSPP/config/ppsspp/PSP/GAME/DOSBox/EBOOT.PBP
+#cp EBOOT.PBP ~/.var/app/org.ppsspp.PPSSPP/config/ppsspp/PSP/GAME/DOSBox/EBOOT.PBP
 
 cd ..

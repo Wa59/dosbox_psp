@@ -77,12 +77,16 @@ enum MachineType {
 	MCH_CGA,
 	MCH_TANDY,
 	MCH_PCJR,
+	MCH_EGA,
 	MCH_VGA
 };
 
 enum SVGACards {
 	SVGA_None,
-	SVGA_S3Trio
+	SVGA_S3Trio,
+	SVGA_TsengET4K,
+	SVGA_TsengET3K,
+	SVGA_ParadisePVGA1A
 }; 
 
 extern SVGACards svgaCard;
@@ -90,7 +94,11 @@ extern MachineType machine;
 extern bool SDLNetInited;
 
 #define IS_TANDY_ARCH ((machine==MCH_TANDY) || (machine==MCH_PCJR))
+#define IS_EGAVGA_ARCH ((machine==MCH_EGA) || (machine==MCH_VGA))
+#define IS_VGA_ARCH (machine==MCH_VGA)
 #define TANDY_ARCH_CASE MCH_TANDY: case MCH_PCJR
+#define EGAVGA_ARCH_CASE MCH_EGA: case MCH_VGA
+#define VGA_ARCH_CASE MCH_VGA
 
 #ifndef DOSBOX_LOGGING_H
 #include "logging.h"

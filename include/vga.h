@@ -27,7 +27,7 @@
 #define VGA_LFB_MAPPED
 //#define VGA_KEEP_CHANGES
 #ifdef PSP
-#define VGA_MEMORY (1*1024*1024)
+#define VGA_MEMORY (2*1024*1024)
 #else
 #define VGA_MEMORY (2*1024*1024)
 #endif
@@ -134,7 +134,7 @@ typedef struct {
 		float hdend, htotal;
 		float parts;
 	} delay;
-	double aspect_ratio;
+	float aspect_ratio;
 	bool double_scan;
 	bool doublewidth,doubleheight;
 	Bit8u font[64*1024];
@@ -335,7 +335,7 @@ typedef union {
 
 typedef struct {
 	Bit8u	linear[VGA_MEMORY];
-} VGA_Memory __attribute__((aligned(4)));
+} VGA_Memory;
 
 typedef struct {
 	//Add a few more just to be safe

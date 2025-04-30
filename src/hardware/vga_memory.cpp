@@ -26,8 +26,8 @@
 #include "inout.h"
 
 #ifdef VGA_KEEP_CHANGES
-//#define MEM_CHANGED( _MEM ) vga.changes.map[ (_MEM) >> VGA_CHANGE_SHIFT ] |= vga.changes.writeMask;
-#define MEM_CHANGED( _MEM ) vga.changes.map[ (_MEM) >> VGA_CHANGE_SHIFT ] = 1;
+#define MEM_CHANGED( _MEM ) vga.changes.map[ (_MEM) >> VGA_CHANGE_SHIFT ] |= vga.changes.writeMask;
+//#define MEM_CHANGED( _MEM ) vga.changes.map[ (_MEM) >> VGA_CHANGE_SHIFT ] = 1;
 #else
 #define MEM_CHANGED( _MEM ) 
 #endif
@@ -57,7 +57,6 @@ static INLINE Bitu  hostRead(HostPt off ) {
 
 
 void VGA_MapMMIO(void);
-
 
 //Nice one from DosEmu
 INLINE static Bit32u RasterOp(Bit32u input,Bit32u mask) {
@@ -103,8 +102,6 @@ INLINE static Bit32u ModeOperation(Bit8u val) {
 	}
 	return full;
 }
-
-
 /* Gonna assume that whoever maps vga memory, maps it on 32/64kb boundary */
 
 #define VGA_PAGES		(128/4)
@@ -125,7 +122,6 @@ public:
 			return (vga.latch.b[vga.config.read_map_select]);
 		case 1:
 			VGA_Latch templatch;
-
 			templatch.d=(vga.latch.d &	FillTable[vga.config.color_dont_care]) ^ FillTable[vga.config.color_compare & vga.config.color_dont_care];
 			return (Bit8u)~(templatch.b[0] | templatch.b[1] | templatch.b[2] | templatch.b[3]);
 		}

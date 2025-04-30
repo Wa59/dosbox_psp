@@ -10,7 +10,7 @@ endif
 
 CFLAGS = -I${PSPDEV}/psp/sdk/include
 dosbox_SOURCES = dosbox.cpp p_sprint.c ftruncate.c
-dosbox_LDADD = cpu/libcpu.a debug/libdebug.a dos/libdos.a fpu/libfpu.a  hardware/libhardware.a gui/libgui.a \
+dosbox_LDADD = cpu/libcpu.a debug/libdebug.a dos/libdos.a fpu/libfpu.a gui/libgui.a  hardware/libhardware.a \
                ints/libints.a misc/libmisc.a shell/libshell.a hardware/serialport/libserial.a \
 	       $(ico_stuff)
 

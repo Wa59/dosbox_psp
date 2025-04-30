@@ -16,6 +16,8 @@
 
 #define PSP_SLICE_SIZE 32
 
+ScalerLineHandler_t RENDER_DrawLine;
+
 struct color {
 	Bit8u red;
 	Bit8u green;
@@ -58,8 +60,6 @@ static struct {
 extern bool autocycles, show_key_hint;
 extern Bit32s CPU_CyclesMax, CPU_CycleUp, CPU_CycleDown;
 
-ScalerLineHandler_t RENDER_DrawLine;
-
 void RENDER_SetPal(Bit8u entry,Bit8u red,Bit8u green,Bit8u blue) {
 	render_int.pal_change = true;
 	render_int.pal[entry].red=red;
@@ -89,8 +89,8 @@ static void GuInit() {
 	sceGuClutMode(psm, 0, 255, 0);
 	sceGuDrawBuffer(psm, (void *)0, 512);
 	sceGuClear(GU_COLOR_BUFFER_BIT | GU_DEPTH_BUFFER_BIT);
-	sceGuOffset(2048 - (480 / 2), 2048 - (272 / 2));
-	sceGuViewport(2048, 2048, 480, 272);
+	sceGuOffset(512 - (480 / 2), 512 - (272 / 2));
+	sceGuViewport(512, 512, 480, 272);
 	sceGuScissor(0, 0, 480, 272);
 	sceGuEnable(GU_SCISSOR_TEST);
 	sceGuFrontFace(GU_CW);
@@ -98,7 +98,7 @@ static void GuInit() {
 	sceGuFinish();
 	sceGuSync(0, 0);
 
-	sceDisplayWaitVblankStart();
+	//sceDisplayWaitVblankStart();
 	sceGuDisplay(1);
 }
 
@@ -230,6 +230,7 @@ static void RENDER_CopyLine(Bitu vidstart, Bitu line, VGA_Line_Handler handler) 
 	handler(vidstart, line, &render_int.draw_buf[render_int.dst.pos + (render_int.buffer2?render_int.dst.size:0)]);
 	render_int.dst.pos+=render_int.dst.pitch;
 }
+
 
 static void IncreaseFrameSkip(void) {
 	if (render_int.frameskip<10) render_int.frameskip++;
