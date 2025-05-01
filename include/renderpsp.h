@@ -14,7 +14,7 @@
 
 /* Much from psp SDL */
 
-#define PSP_SLICE_SIZE 32
+#define PSP_SLICE_SIZE 128
 
 ScalerLineHandler_t RENDER_DrawLine;
 
@@ -98,7 +98,7 @@ static void GuInit() {
 	sceGuFinish();
 	sceGuSync(0, 0);
 
-	//sceDisplayWaitVblankStart();
+	sceDisplayWaitVblankStart();
 	sceGuDisplay(1);
 }
 
@@ -196,8 +196,8 @@ static void GuMakeList(Bit8u * src, unsigned int * list, Bitu x,Bitu y,Bitu dx,B
 			if (vertices[1].x > (dstx + dstdx))
 				vertices[1].x = dstx + dstdx;
 
-			vertices[0].y = dsty;
-			vertices[1].y = vertices[0].y + dstdy;
+			vertices[0].y = 0;
+			vertices[1].y = dstdy;
 		}
 		vertices[0].z = 0;
 		vertices[1].z = 0;
@@ -218,7 +218,6 @@ void RENDER_SetSize(Bitu width,Bitu height,Bitu bpp,float fps, double ratio, boo
  	render_int.dst.pitch = ((width + 15) & ~15)*(bpp/8);
 	render_int.dst.size = (height*render_int.dst.pitch);
 	render_int.draw_buf = (Bit8u *)(((Bit32u)sceGeEdramGetAddr()+sceGeEdramGetSize()-(render_int.dst.size*2))&~15);
-	render_int.buffer2 = false;
 	render_int.update = false;
 	GuInit();
 	GuMakeList(render_int.draw_buf, render_int.list[0], 0, 0, render_int.src.width, render_int.src.height, 0, render_int.dst.pitch);
@@ -227,7 +226,7 @@ void RENDER_SetSize(Bitu width,Bitu height,Bitu bpp,float fps, double ratio, boo
 
 static void RENDER_CopyLine(Bitu vidstart, Bitu line, VGA_Line_Handler handler) {
 	if(!render_int.update || (render_int.dst.pos >= render_int.dst.size)) return;
-	handler(vidstart, line, &render_int.draw_buf[render_int.dst.pos + (render_int.buffer2?render_int.dst.size:0)]);
+	handler(vidstart, line, &render_int.draw_buf[render_int.dst.pos]);
 	render_int.dst.pos+=render_int.dst.pitch;
 }
 
@@ -274,7 +273,6 @@ void RENDER_Init(Section * sec) {
 	render_int.pal_change = true;
 	render_int.draw_buf = NULL;
 	render_int.update = false;
-	render_int.buffer2 = false;
 	render_int.delay_update = false;
 	render_event = sceKernelCreateEventFlag("render_event", 0, 1, NULL);
 	render_thid = sceKernelCreateThread("render_thread", &RenderThread, 20, 512, PSP_THREAD_ATTR_USER, NULL); 
@@ -308,7 +306,6 @@ bool RENDER_StartUpdate() {
 	if (render_int.delay_update) {
 		if(sceKernelPollEventFlag(render_event, 1, PSP_EVENT_WAITCLEAR, NULL) == 0) {
 			sceKernelWakeupThread(render_thid);
-			render_int.buffer2 = !render_int.buffer2;
 			render_int.delay_update = false;
 		}
 		return false;
@@ -321,13 +318,12 @@ bool RENDER_StartUpdate() {
 void RENDER_EndUpdate() {
 	if (!render_int.update) return;
 	hint_list = (show_key_hint?p_spGetHintList(render_int.src.bpp):NULL);
-	vga_list = render_int.list[render_int.buffer2]; 
+	vga_list = render_int.list[0]; 
 	RENDER_DrawLine = RENDER_EmptyLineHandler;
 	if(sceKernelPollEventFlag(render_event, 1, PSP_EVENT_WAITCLEAR, NULL) < 0) 
 		render_int.delay_update = true;
 	else {
 		sceKernelWakeupThread(render_thid);
-		render_int.buffer2 = !render_int.buffer2;
 	}
 	render_int.update = false;
 }

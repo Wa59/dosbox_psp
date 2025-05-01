@@ -1600,6 +1600,8 @@ static const char x86_regs[][4] = {
 	"eax","ecx","edx","ebx","esp","ebp","esi","edi","es","cs","ss","ds","fs","gs","eip" };
 	
 static void dump_x86_regs() {
+/*
+
 	int i;
 	pspDebugScreenPrintf("\n");
         for(i = 0; i < 8; i+=4)
@@ -1611,6 +1613,7 @@ static void dump_x86_regs() {
                                 x86_regs[9], Segs.val[1],x86_regs[10], Segs.val[2], x86_regs[11], Segs.val[3]);
 	pspDebugScreenPrintf("%s:%08X %s:%08X %s:%08X\n", x86_regs[12], Segs.val[4], 
                                 x86_regs[13], Segs.val[5], x86_regs[14], cpu_regs.ip.dword[DW_INDEX]);
+*/
 }
 
 static bool in_exception = false;
@@ -1672,7 +1675,7 @@ static void end_game() {
 #ifdef PSPME
 	stop_me();
 #endif		
-	sceKernelVolatileMemUnlock(0);
+	//sceKernelVolatileMemUnlock(0);
 	sceKernelExitGame();
 }
 
@@ -1680,7 +1683,7 @@ extern bool cache_initialized;
 
 static int psp_exit_callback(int arg1, int arg2, void *common) {
 	sceKernelTerminateDeleteThread(main_thid);
-	exit(0);
+	//exit(0);
 	return 0;
 }
 

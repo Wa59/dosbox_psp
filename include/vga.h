@@ -27,7 +27,7 @@
 #define VGA_LFB_MAPPED
 //#define VGA_KEEP_CHANGES
 #ifdef PSP
-#define VGA_MEMORY (2*1024*1024)
+#define VGA_MEMORY (1024*1024)
 #else
 #define VGA_MEMORY (2*1024*1024)
 #endif

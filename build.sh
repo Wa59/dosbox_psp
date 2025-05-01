@@ -1,6 +1,6 @@
 #!/bin/sh
 
-#./autogen.sh
+./autogen.sh
 
 SDL_CONFIG="${PSPDEV}/psp/bin/sdl-config"
 
@@ -14,8 +14,8 @@ LIBS="-lpspdebug -lpspgu -lpspctrl -lpspdisplay -lpspge -lpspsdk -lpsprtc \
 
 CFLAGS="-I${PSPDEV}/psp/sdk/include"
 
-#./configure -host=psp
-#make clean
+./configure -host=psp
+make clean
 make
 
 cd src
