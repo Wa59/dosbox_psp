@@ -166,7 +166,9 @@ static Bit8u * VGA_Draw_Changes_Line(Bitu vidstart, Bitu line, Bit8u *TempLine) 
 static Bit8u * VGA_Draw_Linear_Line(Bitu vidstart, Bitu line, Bit8u *TempLine) {
 	Bit8u *ret = &vga.draw.linear_base[ vidstart & vga.draw.linear_mask ];
 	memcpy(TempLine, ret, vga.draw.line_length);
-	memcpy(vga.draw.linear_base+vga.draw.linear_mask+1, vga.draw.linear_base, vga.draw.line_length);
+	if (vga.mode == M_EGA) {
+		memcpy(vga.draw.linear_base+vga.draw.linear_mask+1, vga.draw.linear_base, vga.draw.line_length);
+	}
 	return ret;
 }
 

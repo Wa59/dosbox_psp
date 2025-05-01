@@ -218,6 +218,7 @@ void RENDER_SetSize(Bitu width,Bitu height,Bitu bpp,float fps, double ratio, boo
  	render_int.dst.pitch = ((width + 15) & ~15)*(bpp/8);
 	render_int.dst.size = (height*render_int.dst.pitch);
 	render_int.draw_buf = (Bit8u *)(((Bit32u)sceGeEdramGetAddr()+sceGeEdramGetSize()-(render_int.dst.size*2))&~15);
+	render_int.buffer2 = false;
 	render_int.update = false;
 	GuInit();
 	GuMakeList(render_int.draw_buf, render_int.list[0], 0, 0, render_int.src.width, render_int.src.height, 0, render_int.dst.pitch);
@@ -226,7 +227,7 @@ void RENDER_SetSize(Bitu width,Bitu height,Bitu bpp,float fps, double ratio, boo
 
 static void RENDER_CopyLine(Bitu vidstart, Bitu line, VGA_Line_Handler handler) {
 	if(!render_int.update || (render_int.dst.pos >= render_int.dst.size)) return;
-	handler(vidstart, line, &render_int.draw_buf[render_int.dst.pos]);
+	handler(vidstart, line, &render_int.draw_buf[render_int.dst.pos + (render_int.buffer2?render_int.dst.size:0)]);
 	render_int.dst.pos+=render_int.dst.pitch;
 }
 
@@ -318,12 +319,13 @@ bool RENDER_StartUpdate() {
 void RENDER_EndUpdate() {
 	if (!render_int.update) return;
 	hint_list = (show_key_hint?p_spGetHintList(render_int.src.bpp):NULL);
-	vga_list = render_int.list[0]; 
+	vga_list = render_int.list[render_int.buffer2]; 
 	RENDER_DrawLine = RENDER_EmptyLineHandler;
 	if(sceKernelPollEventFlag(render_event, 1, PSP_EVENT_WAITCLEAR, NULL) < 0) 
 		render_int.delay_update = true;
 	else {
 		sceKernelWakeupThread(render_thid);
+		render_int.buffer2 = !render_int.buffer2;
 	}
 	render_int.update = false;
 }
