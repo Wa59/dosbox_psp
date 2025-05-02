@@ -121,7 +121,7 @@ private:
  * The negative side effect: The stored searches will be turned over faster.
  * Should not have impact on systems with few directory entries. */
 #ifdef PSP
-#define MAX_OPENDIRS 128
+#define MAX_OPENDIRS 1024
 #else
 #define MAX_OPENDIRS 2048
 #endif

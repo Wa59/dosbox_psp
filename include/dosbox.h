@@ -22,7 +22,7 @@
 #include "config.h"
 
 #ifndef PSP
-#define USE_GUS 1
+#define USE_GUS 0
 #define USE_SDL 1
 #else
 //#define PSPME

@@ -33,7 +33,7 @@ class PageDirectory;
 #define MEM_PAGE_SIZE	(4096)
 #define XMS_START		(0x110)
 #ifndef PSP
-#define TLB_SIZE		(64*1024)
+#define TLB_SIZE		(1024*1024)
 #define TLB_BANKS		0
 #define BANK_SHIFT		32
 #define BANK_MASK		0

@@ -1646,7 +1646,7 @@ char *realpath(const char *file_name, char *resolved_name);
 
 __attribute__((constructor)) void install_trap_handler() {
 	SceKernelLMOption option;
-	char path[128];
+	char path[255];
 	int args[2], fd, modid;
 
 	memset(&option, 0, sizeof(option));

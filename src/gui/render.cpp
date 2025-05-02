@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2002-2010  The DOSBox Team
+ *  Copyright (C) 2002-2007  The DOSBox Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -16,13 +16,14 @@
  *  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
 
-/* $Id: render.cpp,v 1.60 2009-04-26 19:14:50 harekiet Exp $ */
+/* $Id: render.cpp,v 1.55 2007-08-11 12:19:00 qbix79 Exp $ */
 
 #ifdef PSP
 #include "renderpsp.h"
 #else
 
 #include <sys/types.h>
+#include <dirent.h>
 #include <assert.h>
 #include <math.h>
 
@@ -204,7 +205,7 @@ static void RENDER_Halt( void ) {
 }
 
 extern Bitu PIC_Ticks;
-void RENDER_EndUpdate( bool abort ) {
+void RENDER_EndUpdate( void ) {
 	if (GCC_UNLIKELY(!render.updating))
 		return;
 	RENDER_DrawLine = RENDER_EmptyLineHandler;
@@ -223,7 +224,7 @@ void RENDER_EndUpdate( bool abort ) {
 			flags, fps, (Bit8u *)&scalerSourceCache, (Bit8u*)&render.pal.rgb );
 	}
 	if ( render.scale.outWrite ) {
-		GFX_EndUpdate( abort? NULL : Scaler_ChangedLines );
+		GFX_EndUpdate( Scaler_ChangedLines );
 		render.frameskip.hadSkip[render.frameskip.index] = 0;
 	} else {
 #if 0
@@ -285,7 +286,7 @@ static void RENDER_Reset( void ) {
 		gfx_scalew = 1;
 		gfx_scaleh = 1;
 	}
-	if ((dblh && dblw) || (render.scale.forced && !dblh && !dblw)) {
+	if (dblh && dblw || (render.scale.forced && !dblh && !dblw)) {
 		/* Initialize always working defaults */
 		if (render.scale.size == 2)
 			simpleBlock = &ScaleNormal2x;
@@ -345,8 +346,6 @@ static void RENDER_Reset( void ) {
 				simpleBlock = &ScaleScan2x;
 			else if (render.scale.size == 3)
 				simpleBlock = &ScaleScan3x;
-			break;
-		default:
 			break;
 		}
 #endif
@@ -522,12 +521,6 @@ void RENDER_SetSize(Bitu width,Bitu height,Bitu bpp,float fps,double ratio,bool 
 	if (!width || !height || width > SCALER_MAXWIDTH || height > SCALER_MAXHEIGHT) { 
 		return;	
 	}
-	if ( ratio > 1 ) {
-		double target = height * ratio + 0.1;
-		ratio = target / height;
-	} else {
-		//This would alter the width of the screen, we don't care about rounding errors here
-	}
 	render.src.width=width;
 	render.src.height=height;
 	render.src.bpp=bpp;
@@ -582,43 +575,53 @@ void RENDER_Init(Section * sec) {
 	render.aspect=section->Get_bool("aspect");
 	render.frameskip.max=section->Get_int("frameskip");
 	render.frameskip.count=0;
+	const char * scaler;
 	std::string cline;
-	std::string scaler;
-	//Check for commandline paramters and parse them through the configclass so they get checked against allowed values
+	std::string scaler_str;
 	if (control->cmdline->FindString("-scaler",cline,false)) {
-		section->HandleInputline(std::string("scaler=") + cline);
+		scaler=cline.c_str();
+		render.scale.forced=false;
 	} else if (control->cmdline->FindString("-forcescaler",cline,false)) {
-		section->HandleInputline(std::string("scaler=") + cline + " forced");
+		scaler=cline.c_str();
+		render.scale.forced=true;
+	} else {
+		CommandLine cmd(0,section->Get_string("scaler"));
+		cmd.FindCommand(1,scaler_str);
+		scaler=scaler_str.c_str();
+		render.scale.forced=false;
+		if (cmd.GetCount()>1) {
+			std::string str;
+			if (cmd.FindCommand(2,str)) {
+				if (str=="forced") render.scale.forced=true;
+			}
+		}
 	}
-	   
-	Prop_multival* prop = section->Get_multival("scaler");
-	scaler = prop->GetSection()->Get_string("type");
-	std::string f = prop->GetSection()->Get_string("force");
-	render.scale.forced = false;
-	if(f == "forced") render.scale.forced = true;
-   
-	if (scaler == "none") { render.scale.op = scalerOpNormal;render.scale.size = 1; }
-	else if (scaler == "normal2x") { render.scale.op = scalerOpNormal;render.scale.size = 2; }
-	else if (scaler == "normal3x") { render.scale.op = scalerOpNormal;render.scale.size = 3; }
+	if (!strcasecmp(scaler,"none")) { render.scale.op = scalerOpNormal;render.scale.size = 1; }
+	else if (!strcasecmp(scaler,"normal2x")) { render.scale.op = scalerOpNormal;render.scale.size = 2; }
+	else if (!strcasecmp(scaler,"normal3x")) { render.scale.op = scalerOpNormal;render.scale.size = 3; }
 #if RENDER_USE_ADVANCED_SCALERS>2
-	else if (scaler == "advmame2x") { render.scale.op = scalerOpAdvMame;render.scale.size = 2; }
-	else if (scaler == "advmame3x") { render.scale.op = scalerOpAdvMame;render.scale.size = 3; }
-	else if (scaler == "advinterp2x") { render.scale.op = scalerOpAdvInterp;render.scale.size = 2; }
-	else if (scaler == "advinterp3x") { render.scale.op = scalerOpAdvInterp;render.scale.size = 3; }
-	else if (scaler == "hq2x") { render.scale.op = scalerOpHQ;render.scale.size = 2; }
-	else if (scaler == "hq3x") { render.scale.op = scalerOpHQ;render.scale.size = 3; }
-	else if (scaler == "2xsai") { render.scale.op = scalerOpSaI;render.scale.size = 2; }
-	else if (scaler == "super2xsai") { render.scale.op = scalerOpSuperSaI;render.scale.size = 2; }
-	else if (scaler == "supereagle") { render.scale.op = scalerOpSuperEagle;render.scale.size = 2; }
+	else if (!strcasecmp(scaler,"advmame2x")) { render.scale.op = scalerOpAdvMame;render.scale.size = 2; }
+	else if (!strcasecmp(scaler,"advmame3x")) { render.scale.op = scalerOpAdvMame;render.scale.size = 3; }
+	else if (!strcasecmp(scaler,"advinterp2x")) { render.scale.op = scalerOpAdvInterp;render.scale.size = 2; }
+	else if (!strcasecmp(scaler,"advinterp3x")) { render.scale.op = scalerOpAdvInterp;render.scale.size = 3; }
+	else if (!strcasecmp(scaler,"hq2x")) { render.scale.op = scalerOpHQ;render.scale.size = 2; }
+	else if (!strcasecmp(scaler,"hq3x")) { render.scale.op = scalerOpHQ;render.scale.size = 3; }
+	else if (!strcasecmp(scaler,"2xsai")) { render.scale.op = scalerOpSaI;render.scale.size = 2; }
+	else if (!strcasecmp(scaler,"super2xsai")) { render.scale.op = scalerOpSuperSaI;render.scale.size = 2; }
+	else if (!strcasecmp(scaler,"supereagle")) { render.scale.op = scalerOpSuperEagle;render.scale.size = 2; }
 #endif
 #if RENDER_USE_ADVANCED_SCALERS>0
-	else if (scaler == "tv2x") { render.scale.op = scalerOpTV;render.scale.size = 2; }
-	else if (scaler == "tv3x") { render.scale.op = scalerOpTV;render.scale.size = 3; }
-	else if (scaler == "rgb2x"){ render.scale.op = scalerOpRGB;render.scale.size = 2; }
-	else if (scaler == "rgb3x"){ render.scale.op = scalerOpRGB;render.scale.size = 3; }
-	else if (scaler == "scan2x"){ render.scale.op = scalerOpScan;render.scale.size = 2; }
-	else if (scaler == "scan3x"){ render.scale.op = scalerOpScan;render.scale.size = 3; }
+	else if (!strcasecmp(scaler,"tv2x")) { render.scale.op = scalerOpTV;render.scale.size = 2; }
+	else if (!strcasecmp(scaler,"tv3x")) { render.scale.op = scalerOpTV;render.scale.size = 3; }
+	else if (!strcasecmp(scaler,"rgb2x")){ render.scale.op = scalerOpRGB;render.scale.size = 2; }
+	else if (!strcasecmp(scaler,"rgb3x")){ render.scale.op = scalerOpRGB;render.scale.size = 3; }
+	else if (!strcasecmp(scaler,"scan2x")){ render.scale.op = scalerOpScan;render.scale.size = 2; }
+	else if (!strcasecmp(scaler,"scan3x")){ render.scale.op = scalerOpScan;render.scale.size = 3; }
 #endif
+	else {
+		render.scale.op = scalerOpNormal;render.scale.size = 1; 
+		LOG_MSG("Illegal scaler type %s,falling back to normal.",scaler);
+	}
 
 	//If something changed that needs a ReInit
 	// Only ReInit when there is a src.bpp (fixes crashes on startup and directly changing the scaler without a screen specified yet)
@@ -634,5 +637,4 @@ void RENDER_Init(Section * sec) {
 	MAPPER_AddHandler(IncreaseFrameSkip,MK_f8,MMOD1,"incfskip","Inc Fskip");
 	GFX_SetTitle(-1,render.frameskip.max,false);
 }
-
 #endif
