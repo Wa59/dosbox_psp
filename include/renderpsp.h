@@ -319,6 +319,7 @@ bool RENDER_StartUpdate() {
 void RENDER_EndUpdate() {
 	if (!render_int.update) return;
 	hint_list = (show_key_hint?p_spGetHintList(render_int.src.bpp):NULL);
+
 	vga_list = render_int.list[render_int.buffer2]; 
 	RENDER_DrawLine = RENDER_EmptyLineHandler;
 	if(sceKernelPollEventFlag(render_event, 1, PSP_EVENT_WAITCLEAR, NULL) < 0) 

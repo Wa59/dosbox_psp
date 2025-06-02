@@ -319,6 +319,7 @@ int p_spReadKey(SIrKeybScanCodeData * newKey, unsigned int cur_btnstate) {
 	/* main p_sprint function: 
 	non-blocking routine that fills a pspirkeyb scancode structure
 	Function returns true when a key is found, else false. */
+	static unsigned int list[38] __attribute__((aligned (16)));
 
 	unsigned char new_btn;
 	static unsigned int prev_btnstate = 0;
@@ -444,6 +445,8 @@ int p_spReadKey(SIrKeybScanCodeData * newKey, unsigned int cur_btnstate) {
 release:
 	prev_btnstate = cur_btnstate;
 	memcpy(newKey, &prev_Key, sizeof(SIrKeybScanCodeData));
+
+
 	return 1;
 not_found:
 	prev_btnstate = cur_btnstate;

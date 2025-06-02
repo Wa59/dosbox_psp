@@ -79,6 +79,7 @@ struct private_hwdata {
 #include <pspdisplay.h>
 #include <pspctrl.h>
 #include <pspirkeyb.h>
+#include <pspgu.h>
 #include "p_sprint.h"
 #ifdef PSPME
 #include "me_rpc.h"
@@ -215,6 +216,12 @@ void GFX_Events() {
 		pad.Buttons = 0;
 		pad.Lx = 127;
 		pad.Ly = 127;
+		//clear screen
+		static unsigned int list[8] __attribute__((aligned (16)));
+		sceGuStart(GU_DIRECT,list);
+		sceGuClearColor(0xFF000000);
+	   	sceGuClear(GU_COLOR_BUFFER_BIT);
+	   	sceGuFinish();
 	}
 	if(
 		(pad.Buttons == (PSP_CTRL_LTRIGGER | PSP_CTRL_RTRIGGER | PSP_CTRL_SELECT | PSP_CTRL_UP)) ||
@@ -223,6 +230,12 @@ void GFX_Events() {
 		state_change = true;
 		do_keyb = true;
 		pad.Buttons = 0;
+		//clear screen
+		static unsigned int list[8] __attribute__((aligned (16)));
+		sceGuStart(GU_DIRECT,list);
+		sceGuClearColor(0xFF000000);
+	   	sceGuClear(GU_COLOR_BUFFER_BIT);
+	   	sceGuFinish();
 	}
 
 	if(!do_joy && !do_keyb) state_change = false;
@@ -1548,6 +1561,7 @@ void GFX_Events() {
 			break;
 		case SDL_QUIT:
 			throw(0);
+			sceKernelExitGame();
 			break;
 		case SDL_VIDEOEXPOSE:
 			if (sdl.draw.callback) sdl.draw.callback( GFX_CallBackRedraw );
@@ -1683,6 +1697,7 @@ extern bool cache_initialized;
 
 static int psp_exit_callback(int arg1, int arg2, void *common) {
 	sceKernelTerminateDeleteThread(main_thid);
+	sceKernelExitGame();
 	//exit(0);
 	return 0;
 }
@@ -1957,6 +1972,7 @@ extern "C" int main(int argc, char* argv[]) {
 #else
 	sceKernelNotifyCallback(exit_cbid, 0);
 	sceKernelSleepThread();
+	sceKernelExitGame();	
 #endif
 #ifdef USE_SDL
 	SDL_Quit();//Let's hope sdl will quit as well when it catches an exception
