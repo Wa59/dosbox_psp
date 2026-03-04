@@ -28,6 +28,6 @@ psp-prxgen dosbox dosbox.prx
 
 mksfoex -d MEMSIZE=1 "DOSBox PSP" PARAM.SFO && pack-pbp EBOOT.PBP PARAM.SFO ICON0.PNG NULL NULL PIC1.PNG NULL dosbox.prx NULL
 
-cp EBOOT.PBP ~/.var/app/org.ppsspp.PPSSPP/config/ppsspp/PSP/GAME/DOSBox/EBOOT.PBP
+cp EBOOT.PBP ~/.config/ppsspp/PSP/GAME/DOSBox/EBOOT.PBP
 
 cd ..

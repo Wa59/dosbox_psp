@@ -1723,6 +1723,7 @@ static int psp_callback_thread(SceSize args, void *argp) {
 	exit_cbid = sceKernelCreateCallback("Exit Callback", psp_exit_callback, NULL);
 	sceKernelRegisterExitCallback(exit_cbid);
 	sceKernelSleepThreadCB();
+	return 0;
 }
 
 static int psp_setup_callbacks(void) {
@@ -1734,7 +1735,9 @@ static int psp_setup_callbacks(void) {
 	if(thid >= 0) sceKernelStartThread(thid, 0, 0);
 	return thid;
 }
+
 }
+
 #endif
 
 
@@ -1749,8 +1752,8 @@ void GFX_ShowMsg(char const* format,...) {
 	vsprintf(buf,format,msg);
         strcat(buf,"\n");
 	va_end(msg);
-	if(!no_stdout) printf(buf);       
-};
+	if(!no_stdout) printf(buf);
+}
 
 extern "C" int main(int argc, char* argv[]) {
 	try {

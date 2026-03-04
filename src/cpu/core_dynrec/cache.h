@@ -79,12 +79,63 @@ static Bit8u * cache_code_link_blocks=NULL;
 static CacheBlockDynRec * cache_blocks=NULL;
 static CacheBlockDynRec link_blocks[2];		// default linking (specially marked)
 
+// Invalidation map pool for PSP (reuse 4KB allocations to reduce fragmentation)
+#ifdef PSP
+#define INVALIDATION_MAP_POOL_SIZE 12
+static struct {
+	Bit8u * buffer_pool[INVALIDATION_MAP_POOL_SIZE];
+	Bitu pool_available;
+	Bitu pool_reuse_count;  // diagnostic: track reuse rate
+} inval_map_pool = { {NULL}, 0, 0 };
+
+// Get buffer from pool or allocate new one
+static INLINE Bit8u* AllocInvalidationMap() {
+	if (inval_map_pool.pool_available > 0) {
+		inval_map_pool.pool_available--;
+		inval_map_pool.pool_reuse_count++;
+		return inval_map_pool.buffer_pool[inval_map_pool.pool_available];
+	}
+	return (Bit8u*)malloc(4096);
+}
+
+// Return buffer to pool for reuse
+static INLINE void FreeInvalidationMap(Bit8u* buffer) {
+	if (inval_map_pool.pool_available < INVALIDATION_MAP_POOL_SIZE) {
+		inval_map_pool.buffer_pool[inval_map_pool.pool_available++] = buffer;
+	} else {
+		free(buffer);
+	}
+}
+#endif
+
 // the CodePageHandlerDynRec class provides access to the contained
 // cache blocks and intercepts writes to the code for special treatment
 class CodePageHandlerDynRec : public PageHandler {
 public:
+	// Page classification for invalidation heuristics
+	enum PageClass {
+		PAGE_UNKNOWN = 0,
+		PAGE_CODE = 1,        // Executable section (strict thresholds)
+		PAGE_DATA = 2,        // Data/BSS section (many writes expected)
+		PAGE_STACK = 3,       // Stack area (many transient writes)
+		PAGE_OVERLAY = 4,     // Overlay code (self-modifying by design)
+	};
+
 	CodePageHandlerDynRec() {
 		invalidation_map=NULL;
+		page_class=PAGE_UNKNOWN;
+		classification_cycle=0;
+	}
+
+	// Get invalidation threshold based on page classification
+	int GetInvalidationThreshold() {
+		switch(page_class) {
+			case PAGE_CODE: return 3;      // Code sections: strict
+			case PAGE_OVERLAY: return 5;   // Overlays: lenient
+			case PAGE_DATA: return 8;      // Heap/BSS: very lenient
+			case PAGE_STACK: return 7;     // Stack: lenient
+			default: return 4;              // Default: moderate
+		}
 	}
 
 	void SetupAt(Bitu _phys_page,PageHandler * _old_pagehandler) {
@@ -105,7 +156,11 @@ public:
 		memset(&hash_map,0,sizeof(hash_map));
 		memset(&write_map,0,sizeof(write_map));
 		if (invalidation_map!=NULL) {
+#ifdef PSP
+			FreeInvalidationMap(invalidation_map);
+#else
 			free(invalidation_map);
+#endif
 			invalidation_map=NULL;
 		}
 	}
@@ -150,7 +205,11 @@ public:
 			if (!active_count) Release();	// delay page releasing until active_count is zero
 			return;
 		} else if (!invalidation_map) {
+#ifdef PSP
+			invalidation_map=AllocInvalidationMap();
+#else
 			invalidation_map=(Bit8u*)malloc(4096);
+#endif
 			memset(invalidation_map,0,4096);
 		}
 		invalidation_map[addr]++;
@@ -167,7 +226,11 @@ public:
 			if (!active_count) Release();	// delay page releasing until active_count is zero
 			return;
 		} else if (!invalidation_map) {
+#ifdef PSP
+			invalidation_map=AllocInvalidationMap();
+#else
 			invalidation_map=(Bit8u*)malloc(4096);
+#endif
 			memset(invalidation_map,0,4096);
 		}
 		(*(Bit16u*)&invalidation_map[addr])+=0x101;
@@ -184,7 +247,11 @@ public:
 			if (!active_count) Release();	// delay page releasing until active_count is zero
 			return;
 		} else if (!invalidation_map) {
+#ifdef PSP
+			invalidation_map=AllocInvalidationMap();
+#else
 			invalidation_map=(Bit8u*)malloc(4096);
+#endif
 			memset(invalidation_map,0,4096);
 		}
 		(*(Bit32u*)&invalidation_map[addr])+=0x1010101;
@@ -202,7 +269,11 @@ public:
 			}
 		} else {
 			if (!invalidation_map) {
+#ifdef PSP
+				invalidation_map=AllocInvalidationMap();
+#else
 				invalidation_map=(Bit8u*)malloc(4096);
+#endif
 				memset(invalidation_map,0,4096);
 			}
 			invalidation_map[addr]++;
@@ -226,7 +297,11 @@ public:
 			}
 		} else {
 			if (!invalidation_map) {
+#ifdef PSP
+				invalidation_map=AllocInvalidationMap();
+#else
 				invalidation_map=(Bit8u*)malloc(4096);
+#endif
 				memset(invalidation_map,0,4096);
 			}
 			(((unaligned_half *)&invalidation_map[addr])->val)+=0x101;
@@ -250,7 +325,11 @@ public:
 			}
 		} else {
 			if (!invalidation_map) {
+#ifdef PSP
+				invalidation_map=AllocInvalidationMap();
+#else
 				invalidation_map=(Bit8u*)malloc(4096);
+#endif
 				memset(invalidation_map,0,4096);
 			}
 			(((unaligned_word *)&invalidation_map[addr])->val)+=0x1010101;
@@ -371,8 +450,10 @@ private:
 
 	Bitu active_blocks;		// the number of cache blocks in this page
 	Bitu active_count;		// delaying parameter to not immediately release a page
-	HostPt hostmem;	
+	HostPt hostmem;
 	Bitu phys_page;
+	PageClass page_class;   // Page classification for invalidation thresholds
+	Bitu classification_cycle;  // When page was last classified
 };
 
 
