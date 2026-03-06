@@ -516,11 +516,14 @@ static void VGA_VerticalTimer(Bitu val) {
 		PIC_RemoveEvents( &VGA_DrawPart );
 		RENDER_EndUpdate();
 		vga.draw.parts_left = 0;
+#ifndef PSP
+		/* Force clear of the cache to prevent garbage lines on screen */
+		render.scale.clearCache = true;
+#endif
 	}
 	//Check if we can actually render, else skip the rest
 	if (!RENDER_StartUpdate())
 		return;
-	//TODO Maybe check for an active frame on parts_left and clear that first?
 	vga.draw.parts_left = vga.draw.parts_total;
 	vga.draw.lines_done = 0;
 //	vga.draw.address=vga.config.display_start;
