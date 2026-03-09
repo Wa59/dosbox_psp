@@ -61,7 +61,7 @@
 
 #define CACHE_MAXSIZE	(4096*2)
 #ifdef PSP
-static int CACHE_TOTAL = (1024*1024*4) + (1024*512);
+static int CACHE_TOTAL = (1024*1024*4);
 extern bool fixup;
 #define CACHE_BLOCKS		(45*1024)
 #define CACHE_ALIGN		(4)
