@@ -55,6 +55,8 @@ static struct {
 	struct color pal[256] __attribute__((aligned (16)));
 	unsigned int list[2][256] __attribute__((aligned (16)));
 	Bit8u *draw_buf;
+	Bit8u *current_buf;
+	Bitu buf_offset;
 } render_int;
 
 extern bool autocycles, show_key_hint;
@@ -219,15 +221,17 @@ void RENDER_SetSize(Bitu width,Bitu height,Bitu bpp,float fps, double ratio, boo
 	render_int.dst.size = (height*render_int.dst.pitch);
 	render_int.draw_buf = (Bit8u *)(((Bit32u)sceGeEdramGetAddr()+sceGeEdramGetSize()-(render_int.dst.size*2))&~15);
 	render_int.buffer2 = false;
+	render_int.buf_offset = 0;
+	render_int.current_buf = render_int.draw_buf;
 	render_int.update = false;
 	GuInit();
 	GuMakeList(render_int.draw_buf, render_int.list[0], 0, 0, render_int.src.width, render_int.src.height, 0, render_int.dst.pitch);
 	GuMakeList(&render_int.draw_buf[render_int.dst.size], render_int.list[1], 0, 0, render_int.src.width, render_int.src.height, 0, render_int.dst.pitch);
 }
 
-static void RENDER_CopyLine(Bitu vidstart, Bitu line, VGA_Line_Handler handler) {
+static inline void RENDER_CopyLine(Bitu vidstart, Bitu line, VGA_Line_Handler handler) {
 	if(!render_int.update || (render_int.dst.pos >= render_int.dst.size)) return;
-	handler(vidstart, line, &render_int.draw_buf[render_int.dst.pos + (render_int.buffer2?render_int.dst.size:0)]);
+	handler(vidstart, line, &render_int.current_buf[render_int.dst.pos]);
 	render_int.dst.pos+=render_int.dst.pitch;
 }
 
@@ -312,6 +316,7 @@ bool RENDER_StartUpdate() {
 		return false;
 	}
 	render_int.update = true;
+	render_int.current_buf = render_int.draw_buf + render_int.buf_offset;
 	RENDER_DrawLine = RENDER_CopyLine;
 	return true;
 }
@@ -327,6 +332,7 @@ void RENDER_EndUpdate() {
 	else {
 		sceKernelWakeupThread(render_thid);
 		render_int.buffer2 = !render_int.buffer2;
+		render_int.buf_offset = render_int.buffer2 ? render_int.dst.size : 0;
 	}
 	render_int.update = false;
 }
