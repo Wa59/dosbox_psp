@@ -164,11 +164,23 @@ static Bit8u * VGA_Draw_Changes_Line(Bitu vidstart, Bitu line, Bit8u *TempLine) 
 #endif
 
 static Bit8u * VGA_Draw_Linear_Line(Bitu vidstart, Bitu line, Bit8u *TempLine) {
-	Bit8u *ret = &vga.draw.linear_base[ vidstart & vga.draw.linear_mask ];
-	memcpy(TempLine, ret, vga.draw.line_length);
+	Bitu offset = vidstart & vga.draw.linear_mask;
+	Bit8u *ret = &vga.draw.linear_base[ offset ];
+	Bitu line_len = vga.draw.line_length;
+	
+	/* Handle potential wrap-around for EGA mode during vertical scrolling */
+	if (vga.mode == M_EGA && (offset + line_len) > vga.draw.linear_mask) {
+		/* Line wraps around the buffer boundary - copy in two parts */
+		Bitu part1_len = (vga.draw.linear_mask + 1) - offset;
+		Bitu part2_len = line_len - part1_len;
+		memcpy(TempLine, ret, part1_len);
+		memcpy(TempLine + part1_len, vga.draw.linear_base, part2_len);
+	} else {
+		memcpy(TempLine, ret, line_len);
+	}
 #if !defined(C_UNALIGNED_MEMORY)
 	if (GCC_UNLIKELY( ((Bitu)ret) & (sizeof(Bitu)-1)) ) {
-		memcpy( TempLine, ret, vga.draw.line_length );
+		memcpy( TempLine, ret, line_len );
 		return TempLine;
 	}
 #endif
