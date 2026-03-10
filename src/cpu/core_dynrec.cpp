@@ -71,7 +71,7 @@ extern bool fixup;
 #define CACHE_ALIGN		(16)
 #endif
 #define CACHE_PAGES		(512)
-#define DYN_HASH_SHIFT	(3)
+#define DYN_HASH_SHIFT	(4)
 #define DYN_PAGE_HASH	(4096>>DYN_HASH_SHIFT)
 #define DYN_LINKS		(16)
 
@@ -135,6 +135,7 @@ enum BlockReturn {
 // identificator to signal self-modification of the currently executed block
 #define SMC_CURRENT_BLOCK	0xffff
 
+
 static void IllegalOptionDynrec(const char* msg) {
 	E_Exit("DynrecCore: illegal option in %s",msg);
 }
@@ -149,35 +150,6 @@ static struct {
 #include "lazyflags.h"
 
 #include "core_dynrec/cache.h"
-
-//PSP optimization
-struct {
-	Bitu address;
-	CacheBlockDynRec *block;
-	Bit8u hit_count;
-} recent_links[4] = { {0,NULL,0}, {0,NULL,0}, {0,NULL,0}, {0,NULL,0} };
-
-static INLINE void UpdateRecentLink(Bitu addr, CacheBlockDynRec *block) {
-	int min_idx = 0;
-	for (int i=1; i<4; i++) {
-		if (recent_links[i].hit_count < recent_links[min_idx].hit_count) {
-			min_idx = i;
-		}
-	}
-	recent_links[min_idx].address = addr;
-	recent_links[min_idx].block = block;
-	recent_links[min_idx].hit_count = 1;
-}
-
-static INLINE CacheBlockDynRec* CheckRecentLink(Bitu addr) {
-	for (int i=0; i<4; i++) {
-		if (recent_links[i].address == addr && recent_links[i].block != NULL) {
-			recent_links[i].hit_count++;
-			return recent_links[i].block;
-		}
-	}
-	return NULL;
-}
 
 #define X86		0x01
 #define X86_64		0x02
@@ -195,18 +167,16 @@ static INLINE CacheBlockDynRec* CheckRecentLink(Bitu addr) {
 
 CacheBlockDynRec * LinkBlocks(BlockReturn ret) {
 	CacheBlockDynRec * block=NULL;
+	// the last instruction was a control flow modifying instruction
 	Bitu temp_ip=SegPhys(cs)+reg_eip;
 	Bitu temp_page=temp_ip >> 12;
 	CodePageHandlerDynRec * temp_handler=(CodePageHandlerDynRec *)get_tlb_entry(temp_ip)->handler;
 	if (temp_handler->flags & PFLAG_HASCODE) {
+		// see if the target is an already translated block
 		block=temp_handler->FindCacheBlock(temp_ip & 4095);
-		if (!block) {
-			block = CheckRecentLink(temp_ip);
-			if (!block) return NULL;
-		} else {
-			UpdateRecentLink(temp_ip, block);
-		}
+		if (!block) return NULL;
 
+		// found it, link the current block to 
 		cache.block.running->LinkTo(ret==BR_Link2,block);
 		return block;
 	}
@@ -249,8 +219,7 @@ Bits CPU_Core_Dynrec_Run(void) {
 		if (!block) {
 			// no block found, thus translate the instruction stream
 			// unless the instruction is known to be modified
-			int threshold = chandler->GetInvalidationThreshold();
-			if (!chandler->invalidation_map || (chandler->invalidation_map[ip_point&4095] < threshold)) {
+			if (!chandler->invalidation_map || (chandler->invalidation_map[ip_point&4095]<4)) {
 				// translate up to 32 instructions
 				block=CreateCacheBlock(chandler,ip_point,28);
 			} else {
