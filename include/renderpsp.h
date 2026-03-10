@@ -235,7 +235,6 @@ static inline void RENDER_CopyLine(Bitu vidstart, Bitu line, VGA_Line_Handler ha
 	render_int.dst.pos+=render_int.dst.pitch;
 }
 
-
 static void IncreaseFrameSkip(void) {
 	if (render_int.frameskip<10) render_int.frameskip++;
 	LOG_MSG("Frame Skip at %d",render_int.frameskip);

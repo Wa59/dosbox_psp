@@ -164,20 +164,41 @@ static Bit8u * VGA_Draw_Changes_Line(Bitu vidstart, Bitu line, Bit8u *TempLine) 
 #endif
 
 static Bit8u * VGA_Draw_Linear_Line(Bitu vidstart, Bitu line, Bit8u *TempLine) {
-	Bit8u *ret = &vga.draw.linear_base[ vidstart & vga.draw.linear_mask ];
-	memcpy(TempLine, ret, vga.draw.line_length);
+	Bitu offset = vidstart & vga.draw.linear_mask;
+	Bit8u *ret = &vga.draw.linear_base[ offset ];
+	Bitu len = vga.draw.line_length;
+	/* Use word-aligned copy for better PSP cache performance */
+	if (len >= 16 && !(offset & 3) && !((Bitu)TempLine & 3)) {
+		Bitu *src = (Bitu *)ret;
+		Bitu *dst = (Bitu *)TempLine;
+		for (Bitu i = len >> 2; i > 0; i--) *dst++ = *src++;
+		if (len & 3) memcpy((Bit8u *)dst, (Bit8u *)src, len & 3);
+	} else {
+		memcpy(TempLine, ret, len);
+	}
 	if (vga.mode == M_EGA) {
-		memcpy(vga.draw.linear_base+vga.draw.linear_mask+1, vga.draw.linear_base, vga.draw.line_length);
+		Bit8u *dst = vga.draw.linear_base + vga.draw.linear_mask + 1;
+		if (len >= 16 && !((Bitu)dst & 3)) {
+			Bitu *src = (Bitu *)ret;
+			Bitu *dst_w = (Bitu *)dst;
+			for (Bitu i = len >> 2; i > 0; i--) *dst_w++ = *src++;
+			if (len & 3) memcpy((Bit8u *)dst_w, (Bit8u *)src, len & 3);
+		} else {
+			memcpy(dst, ret, len);
+		}
 	}
 	return ret;
 }
 
-//Test version, might as well keep it
+//Optimized chain line drawing with cached calculations
 static Bit8u * VGA_Draw_Chain_Line(Bitu vidstart, Bitu line, Bit8u *TempLine) {
-	Bitu i = 0;
-	for ( i = 0; i < vga.draw.width;i++ ) {
+	Bitu width = vga.draw.width;
+	Bit8u *mem = vga.mem.linear;
+	for (Bitu i = 0; i < width; i++) {
 		Bitu addr = vidstart + i;
-		TempLine[i] = vga.mem.linear[((addr&~3)<<2)+(addr&3)];
+		/* Pre-calculate the chain address: ((addr&~3)<<2)+(addr&3) */
+		Bitu chain_addr = ((addr & 0xFFFFFFFC) << 2) | (addr & 3);
+		TempLine[i] = mem[chain_addr];
 	}
 	return TempLine;
 }
@@ -185,39 +206,44 @@ static Bit8u * VGA_Draw_Chain_Line(Bitu vidstart, Bitu line, Bit8u *TempLine) {
 static Bit8u * VGA_Draw_VGA_Line_HWMouse( Bitu vidstart, Bitu line, Bit8u *TempLine) {
 	if(vga.s3.hgc.curmode & 0x1) {
 		Bitu lineat = vidstart / vga.draw.width;
-		if((lineat < vga.s3.hgc.originy) || (lineat > (vga.s3.hgc.originy + 63U))) {
+		Bitu origin_y = vga.s3.hgc.originy;
+		if((lineat < origin_y) || (lineat > (origin_y + 63U))) {
 			return &vga.mem.linear[ vidstart ];
 		} else {
-			memcpy(TempLine, &vga.mem.linear[ vidstart ], vga.draw.width);
-			/* Draw mouse cursor */
-			Bits moff = ((Bits)lineat - (Bits)vga.s3.hgc.originy) + (Bits)vga.s3.hgc.posy;
+			Bitu width = vga.draw.width;
+			memcpy(TempLine, &vga.mem.linear[ vidstart ], width);
+			/* Draw mouse cursor - cache frequently used values */
+			Bits moff = ((Bits)lineat - (Bits)origin_y) + (Bits)vga.s3.hgc.posy;
 			if(moff>63) return &vga.mem.linear[ vidstart ];
 			if(moff<0) moff+=64;
-			Bitu xat = vga.s3.hgc.originx;
-			Bitu m, mapat;
+			Bitu origin_x = vga.s3.hgc.originx;
+			Bitu xat = origin_x;
+			Bitu m, mapat = 0;
 			Bits r, z;
-			mapat = 0;
+			Bit8u *mem = vga.mem.linear;
 
-			Bitu mouseaddr = (Bit32u)vga.s3.hgc.startaddr * (Bit32u)1024;
-			mouseaddr+=(moff * 16);
+			Bitu mouseaddr = (Bit32u)vga.s3.hgc.startaddr * (Bit32u)1024 + (moff * 16);
+			Bit8u *back_color = vga.s3.hgc.backstack;
+			Bit8u *fore_color = vga.s3.hgc.forestack;
 
 			Bit16u bitsA, bitsB;
 			Bit8u mappoint;
 			for(m=0;m<4;m++) {
-				bitsA = *(Bit16u *)&vga.mem.linear[mouseaddr];
+				bitsA = *(Bit16u *)&mem[mouseaddr];
 				mouseaddr+=2;
-				bitsB = *(Bit16u *)&vga.mem.linear[mouseaddr];
+				bitsB = *(Bit16u *)&mem[mouseaddr];
 				mouseaddr+=2;
 				z = 7;
 				for(r=15;r>=0;--r) {
 					mappoint = (((bitsA >> z) & 0x1) << 1) | ((bitsB >> z) & 0x1);
-					if(mapat >= vga.s3.hgc.posx) {
+					Bitu posx = vga.s3.hgc.posx;
+					if(mapat >= posx) {
 						switch(mappoint) {
 					case 0:
-						TempLine[xat] = vga.s3.hgc.backstack[0];
+						TempLine[xat] = back_color[0];
 						break;
 					case 1:
-						TempLine[xat] = vga.s3.hgc.forestack[0];
+						TempLine[xat] = fore_color[0];
 						break;
 					case 2:
 						//Transparent
@@ -245,28 +271,32 @@ static Bit8u * VGA_Draw_VGA_Line_HWMouse( Bitu vidstart, Bitu line, Bit8u *TempL
 static Bit8u * VGA_Draw_LIN16_Line_HWMouse(Bitu vidstart,   Bitu line, Bit8u *TempLine) {
 	if(vga.s3.hgc.curmode & 0x1) {
 		Bitu lineat = (vidstart >> 1) / vga.draw.width;
-		if((lineat < vga.s3.hgc.originy) || (lineat > (vga.s3.hgc.originy + 63U))) {
+		Bitu origin_y = vga.s3.hgc.originy;
+		if((lineat < origin_y) || (lineat > (origin_y + 63U))) {
 			return &vga.mem.linear[ vidstart ];
 		} else {
-			memcpy(TempLine, &vga.mem.linear[ vidstart ], 2*vga.draw.width);
-			/* Draw mouse cursor */
-			Bits moff = ((Bits)lineat - (Bits)vga.s3.hgc.originy) + (Bits)vga.s3.hgc.posy;
+			Bitu width = vga.draw.width;
+			memcpy(TempLine, &vga.mem.linear[ vidstart ], 2*width);
+			/* Draw mouse cursor - cache frequently used values */
+			Bits moff = ((Bits)lineat - (Bits)origin_y) + (Bits)vga.s3.hgc.posy;
 			if(moff>63) return &vga.mem.linear[ vidstart ];
 			if(moff<0) moff+=64;
-			Bitu xat = 2*vga.s3.hgc.originx;
-			Bitu m, mapat;
+			Bitu origin_x = vga.s3.hgc.originx;
+			Bitu xat = 2*origin_x;
+			Bitu m, mapat = 0;
 			Bits r, z;
-			mapat = 0;
+			Bit8u *mem = vga.mem.linear;
+			Bit8u *back_color = vga.s3.hgc.backstack;
+			Bit8u *fore_color = vga.s3.hgc.forestack;
 
-			Bitu mouseaddr = (Bit32u)vga.s3.hgc.startaddr * (Bit32u)1024;
-			mouseaddr+=(moff * 16);
+			Bitu mouseaddr = (Bit32u)vga.s3.hgc.startaddr * (Bit32u)1024 + (moff * 16);
 
 			Bit16u bitsA, bitsB;
 			Bit8u mappoint;
 			for(m=0;m<4;m++) {
-				bitsA = *(Bit16u *)&vga.mem.linear[mouseaddr];
+				bitsA = *(Bit16u *)&mem[mouseaddr];
 				mouseaddr+=2;
-				bitsB = *(Bit16u *)&vga.mem.linear[mouseaddr];
+				bitsB = *(Bit16u *)&mem[mouseaddr];
 				mouseaddr+=2;
 				z = 7;
 				for(r=15;r>=0;--r) {
@@ -308,28 +338,32 @@ static Bit8u * VGA_Draw_LIN16_Line_HWMouse(Bitu vidstart,   Bitu line, Bit8u *Te
 static Bit8u * VGA_Draw_LIN32_Line_HWMouse(Bitu vidstart,   Bitu line, Bit8u *TempLine) {
 	if(vga.s3.hgc.curmode & 0x1) {
 		Bitu lineat = (vidstart >> 2) / vga.draw.width;
-		if((lineat < vga.s3.hgc.originy) || (lineat > (vga.s3.hgc.originy + 63U))) {
+		Bitu origin_y = vga.s3.hgc.originy;
+		if((lineat < origin_y) || (lineat > (origin_y + 63U))) {
 			return &vga.mem.linear[ vidstart ];
 		} else {
-			memcpy(TempLine, &vga.mem.linear[ vidstart ], 4*vga.draw.width);
-			/* Draw mouse cursor */
-			Bits moff = ((Bits)lineat - (Bits)vga.s3.hgc.originy) + (Bits)vga.s3.hgc.posy;
+			Bitu width = vga.draw.width;
+			memcpy(TempLine, &vga.mem.linear[ vidstart ], 4*width);
+			/* Draw mouse cursor - cache frequently used values */
+			Bits moff = ((Bits)lineat - (Bits)origin_y) + (Bits)vga.s3.hgc.posy;
 			if(moff>63) return &vga.mem.linear[ vidstart ];
 			if(moff<0) moff+=64;
-			Bitu xat = 4*vga.s3.hgc.originx;
-			Bitu m, mapat;
+			Bitu origin_x = vga.s3.hgc.originx;
+			Bitu xat = 4*origin_x;
+			Bitu m, mapat = 0;
 			Bits r, z;
-			mapat = 0;
+			Bit8u *mem = vga.mem.linear;
+			Bit8u *back_color = vga.s3.hgc.backstack;
+			Bit8u *fore_color = vga.s3.hgc.forestack;
 
-			Bitu mouseaddr = (Bit32u)vga.s3.hgc.startaddr * (Bit32u)1024;
-			mouseaddr+=(moff * 16);
+			Bitu mouseaddr = (Bit32u)vga.s3.hgc.startaddr * (Bit32u)1024 + (moff * 16);
 
 			Bit16u bitsA, bitsB;
 			Bit8u mappoint;
 			for(m=0;m<4;m++) {
-				bitsA = *(Bit16u *)&vga.mem.linear[mouseaddr];
+				bitsA = *(Bit16u *)&mem[mouseaddr];
 				mouseaddr+=2;
-				bitsB = *(Bit16u *)&vga.mem.linear[mouseaddr];
+				bitsB = *(Bit16u *)&mem[mouseaddr];
 				mouseaddr+=2;
 				z = 7;
 				for(r=15;r>=0;--r) {
